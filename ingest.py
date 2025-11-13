@@ -41,6 +41,14 @@ def _nms(boxes: List[List[int]], scores: List[float], iou_thresh: float = 0.9) -
         idxs = [j for j in idxs if _iou(boxes[i], boxes[j]) < iou_thresh]
     return keep
 
+def _prepare_pil(img: Image.Image) -> Image.Image:
+    """Ensure PIL RGB image."""
+    if not isinstance(img, Image.Image):
+        img = Image.fromarray(np.array(img))
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+    return img
+
 def get_sam_model(device):
     sam_checkpoint = "sam_vit_b_01ec64.pth"
     model_type = "vit_b"
@@ -100,14 +108,6 @@ def ingest_single_image(image_path, index_path, metadata_path):
     new_embeddings = []
     new_metadata_entries = {}
 
-    def _prepare_pil(img: Image.Image) -> Image.Image:
-        """Ensure PIL RGB image."""
-        if not isinstance(img, Image.Image):
-            img = Image.fromarray(np.array(img))
-        if img.mode != "RGB":
-            img = img.convert("RGB")
-        return img
-
     # 1. Global embedding
     img_for_clip = _prepare_pil(image)
     # Force channels_last to avoid ambiguity on tiny images (e.g., 1xN or Nx1)
@@ -148,7 +148,6 @@ def ingest_single_image(image_path, index_path, metadata_path):
     keep_idx = _nms(candidate_boxes, candidate_scores, iou_thresh=0.8)
     # Keep only the top-N highest scoring boxes to avoid background clutter
     MAX_OBJECTS_PER_IMAGE = 12
-    keep_idx.sort(key=lambda k: candidate_scores[k], reverse=True)
     keep_idx = keep_idx[:MAX_OBJECTS_PER_IMAGE]
 
     for i_keep, k in enumerate(keep_idx):
@@ -243,13 +242,6 @@ def ingest_images_directory(images_dir, index_path, metadata_path):
     clip_model.eval()
     clip_processor = CLIPProcessor.from_pretrained(clip_model_name)
     print(device)
-    def _prepare_pil(img: Image.Image) -> Image.Image:
-        """Ensure PIL RGB image."""
-        if not isinstance(img, Image.Image):
-            img = Image.fromarray(np.array(img))
-        if img.mode != "RGB":
-            img = img.convert("RGB")
-        return img
 
     all_embeddings = []
     all_metadata = {}
